@@ -1,4 +1,4 @@
-module github.com/throttled/throttled
+module github.com/rajivbaviskar03/throttled
 
 go 1.12
 
