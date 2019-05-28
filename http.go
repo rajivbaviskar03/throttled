@@ -2,6 +2,7 @@ package throttled
 
 import (
 	"errors"
+	"github.com/gin-gonic/gin"
 	"math"
 	"net/http"
 	"strconv"
@@ -79,6 +80,38 @@ func (t *HTTPRateLimiter) RateLimit(h http.Handler) http.Handler {
 			dh.ServeHTTP(w, r)
 		}
 	})
+}
+
+func (t *HTTPRateLimiter) GinRateLimit(c *gin.Context) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if t.RateLimiter == nil {
+			t.error(c.Writer, c.Request, errors.New("You must set a RateLimiter on HTTPRateLimiter"))
+		}
+
+		var k string
+		if t.VaryBy != nil {
+			k = t.VaryBy.Key(c.Request)
+		}
+
+		limited, context, err := t.RateLimiter.RateLimit(k, 1)
+
+		if err != nil {
+			//t.error(w, r, err)
+			return
+		}
+
+		setRateLimitHeaders(c.Writer, context)
+
+		if !limited {
+			c.Next()
+		} else {
+			dh := t.DeniedHandler
+			if dh == nil {
+				dh = DefaultDeniedHandler
+			}
+			dh.ServeHTTP(c.Writer, c.Request)
+		}
+	}
 }
 
 func (t *HTTPRateLimiter) error(w http.ResponseWriter, r *http.Request, err error) {
